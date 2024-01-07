@@ -5,7 +5,7 @@ use futures_core::stream::BoxStream;
 use futures_util::{future, StreamExt, TryFutureExt, TryStreamExt};
 
 use crate::arguments::{Arguments, IntoArguments};
-use crate::database::{Database, HasArguments, HasStatement, HasStatementCache};
+use crate::database::{Database, HasStatementCache};
 use crate::encode::Encode;
 use crate::error::Error;
 use crate::executor::{Execute, Executor};
@@ -15,7 +15,7 @@ use crate::types::Type;
 /// Raw SQL query with bind parameters. Returned by [`query`][crate::query::query].
 #[must_use = "query must be executed to affect database"]
 pub struct Query<'q, DB: Database, A> {
-    pub(crate) statement: Either<&'q str, &'q <DB as HasStatement<'q>>::Statement>,
+    pub(crate) statement: Either<&'q str, &'q DB::Statement<'q>>,
     pub(crate) arguments: Option<A>,
     pub(crate) database: PhantomData<DB>,
     pub(crate) persistent: bool,
@@ -49,7 +49,7 @@ where
         }
     }
 
-    fn statement(&self) -> Option<&<DB as HasStatement<'q>>::Statement> {
+    fn statement(&self) -> Option<&DB::Statement<'q>> {
         match self.statement {
             Either::Right(ref statement) => Some(&statement),
             Either::Left(_) => None,
@@ -57,7 +57,7 @@ where
     }
 
     #[inline]
-    fn take_arguments(&mut self) -> Option<<DB as HasArguments<'q>>::Arguments> {
+    fn take_arguments(&mut self) -> Option<<DB as Database>::Arguments<'q>> {
         self.arguments.take().map(IntoArguments::into_arguments)
     }
 
@@ -67,7 +67,7 @@ where
     }
 }
 
-impl<'q, DB: Database> Query<'q, DB, <DB as HasArguments<'q>>::Arguments> {
+impl<'q, DB: Database> Query<'q, DB, <DB as Database>::Arguments<'q>> {
     /// Bind a value for use with this SQL query.
     ///
     /// If the number of times this is called does not match the number of bind parameters that
@@ -238,12 +238,12 @@ where
     }
 
     #[inline]
-    fn statement(&self) -> Option<&<DB as HasStatement<'q>>::Statement> {
+    fn statement(&self) -> Option<&DB::Statement<'q>> {
         self.inner.statement()
     }
 
     #[inline]
-    fn take_arguments(&mut self) -> Option<<DB as HasArguments<'q>>::Arguments> {
+    fn take_arguments(&mut self) -> Option<<DB as Database>::Arguments<'q>> {
         self.inner.take_arguments()
     }
 
@@ -396,8 +396,8 @@ where
 
 // Make a SQL query from a statement.
 pub fn query_statement<'q, DB>(
-    statement: &'q <DB as HasStatement<'q>>::Statement,
-) -> Query<'q, DB, <DB as HasArguments<'_>>::Arguments>
+    statement: &'q DB::Statement<'q>,
+) -> Query<'q, DB, <DB as Database>::Arguments<'_>>
 where
     DB: Database,
 {
@@ -411,7 +411,7 @@ where
 
 // Make a SQL query from a statement, with the given arguments.
 pub fn query_statement_with<'q, DB, A>(
-    statement: &'q <DB as HasStatement<'q>>::Statement,
+    statement: &'q DB::Statement<'q>,
     arguments: A,
 ) -> Query<'q, DB, A>
 where
@@ -427,7 +427,7 @@ where
 }
 
 /// Make a SQL query.
-pub fn query<DB>(sql: &str) -> Query<'_, DB, <DB as HasArguments<'_>>::Arguments>
+pub fn query<DB>(sql: &str) -> Query<'_, DB, <DB as Database>::Arguments<'_>>
 where
     DB: Database,
 {

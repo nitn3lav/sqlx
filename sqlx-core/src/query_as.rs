@@ -5,7 +5,7 @@ use futures_core::stream::BoxStream;
 use futures_util::{StreamExt, TryStreamExt};
 
 use crate::arguments::IntoArguments;
-use crate::database::{Database, HasArguments, HasStatement, HasStatementCache};
+use crate::database::{Database, HasStatementCache};
 use crate::encode::Encode;
 use crate::error::Error;
 use crate::executor::{Execute, Executor};
@@ -32,12 +32,12 @@ where
     }
 
     #[inline]
-    fn statement(&self) -> Option<&<DB as HasStatement<'q>>::Statement> {
+    fn statement(&self) -> Option<&DB::Statement<'q>> {
         self.inner.statement()
     }
 
     #[inline]
-    fn take_arguments(&mut self) -> Option<<DB as HasArguments<'q>>::Arguments> {
+    fn take_arguments(&mut self) -> Option<<DB as Database>::Arguments<'q>> {
         self.inner.take_arguments()
     }
 
@@ -47,7 +47,7 @@ where
     }
 }
 
-impl<'q, DB: Database, O> QueryAs<'q, DB, O, <DB as HasArguments<'q>>::Arguments> {
+impl<'q, DB: Database, O> QueryAs<'q, DB, O, <DB as Database>::Arguments<'q>> {
     /// Bind a value for use with this SQL query.
     ///
     /// See [`Query::bind`](Query::bind).
@@ -168,7 +168,7 @@ where
 /// Make a SQL query that is mapped to a concrete type
 /// using [`FromRow`].
 #[inline]
-pub fn query_as<'q, DB, O>(sql: &'q str) -> QueryAs<'q, DB, O, <DB as HasArguments<'q>>::Arguments>
+pub fn query_as<'q, DB, O>(sql: &'q str) -> QueryAs<'q, DB, O, <DB as Database>::Arguments<'q>>
 where
     DB: Database,
     O: for<'r> FromRow<'r, DB::Row>,
@@ -196,8 +196,8 @@ where
 
 // Make a SQL query from a statement, that is mapped to a concrete type.
 pub fn query_statement_as<'q, DB, O>(
-    statement: &'q <DB as HasStatement<'q>>::Statement,
-) -> QueryAs<'q, DB, O, <DB as HasArguments<'_>>::Arguments>
+    statement: &'q DB::Statement<'q>,
+) -> QueryAs<'q, DB, O, <DB as Database>::Arguments<'_>>
 where
     DB: Database,
     O: for<'r> FromRow<'r, DB::Row>,
@@ -210,7 +210,7 @@ where
 
 // Make a SQL query from a statement, with the given arguments, that is mapped to a concrete type.
 pub fn query_statement_as_with<'q, DB, O, A>(
-    statement: &'q <DB as HasStatement<'q>>::Statement,
+    statement: &'q DB::Statement<'q>,
     arguments: A,
 ) -> QueryAs<'q, DB, O, A>
 where
